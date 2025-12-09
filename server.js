@@ -166,24 +166,39 @@ function formatDateTimeYmdToDmy(s) {
 // -----------------------------------------------------------------------------
 app.disable('x-powered-by');
 
-// Helmet con CSP estricta y otras cabeceras de seguridad
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      "default-src": ["'self'"],
-      "script-src": ["'self'"],
-      "img-src": ["'self'", "data:"],
-      "style-src": ["'self'", "'unsafe-inline'"], // permite CSS propio + estilos inline sencillos
-      "font-src": ["'self'", "data:"],
-      "object-src": ["'none'"],
-      "frame-ancestors": ["'none'"],
-      "base-uri": ["'self'"],
-      "form-action": ["'self'"]
-    }
-  },
-  referrerPolicy: { policy: "no-referrer" }
-}));
+// -----------------------------------------------------------------------------
+// Helmet y cabeceras de seguridad
+//  - En producción: CSP sin "upgrade-insecure-requests"
+//  - En desarrollo: CSP desactivada para no romper HTTP simple en el VPS
+// -----------------------------------------------------------------------------
+if (IS_PROD) {
+  app.use(helmet({
+    contentSecurityPolicy: {
+      // NO usamos los defaults para evitar "upgrade-insecure-requests"
+      useDefaults: false,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:"],
+        "font-src": ["'self'", "data:"],
+        "object-src": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"]
+      }
+    },
+    referrerPolicy: { policy: "no-referrer" },
+    crossOriginEmbedderPolicy: false
+  }));
+} else {
+  // Desarrollo: sin CSP, solo referrerPolicy y demás protecciones ligeras
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    referrerPolicy: { policy: "no-referrer" },
+    crossOriginEmbedderPolicy: false
+  }));
+}
 
 // Compresión – mejora rendimiento
 app.use(compression());
