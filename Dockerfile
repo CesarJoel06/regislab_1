@@ -1,30 +1,35 @@
-FROM node:20-bullseye-slim
+# Imagen base de Node con Debian (compatibles sqlite3, pdfkit, etc.)
+FROM node:20-bookworm-slim
 
-# Entorno de producción dentro del contenedor
-ENV NODE_ENV=production
+# Directorio de trabajo dentro del contenedor
+WORKDIR /usr/src/app
 
-# Directorio de trabajo
-WORKDIR /app
+# (Opcional pero recomendable) Paquetes para compilar dependencias nativas
+# como sqlite3 si no hay binarios precompilados
+RUN apt-get update && \
+    apt-get install -y python3 build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copiamos sólo archivos necesarios para instalar dependencias
-# Los patrones con * permiten usar package-lock.json y .npmrc si existen
-COPY package.json package-lock.json* .npmrc* ./
+# Copiar solo package.json/package-lock primero para aprovechar cache
+COPY package*.json ./
 
-# Instalamos dependencias sin las de desarrollo
-# Si falla la opción con --omit=dev (por versión de npm), hace un npm install normal
-RUN npm install --omit=dev || npm install
+# Instalar dependencias en modo producción
+RUN npm ci --omit=dev || npm install --omit=dev
 
-# Copiamos el resto del código de la aplicación
+# Copiar el resto del código de la app
 COPY . .
 
-# Asignamos la propiedad de la app al usuario 'node' que ya existe en la imagen oficial
-RUN chown -R node:node /app
+# Crear carpeta de datos y dar permisos al usuario "node"
+RUN mkdir -p data && chown -R node:node /usr/src/app
 
-# A partir de aquí, dejamos de usar root y corremos como usuario no privilegiado
+# Usar usuario no root
 USER node
 
-# Puerto de la aplicación
+# Variables de entorno por defecto (se pueden sobreescribir en docker run)
+ENV NODE_ENV=production
+
+# Puerto donde escucha tu app
 EXPOSE 3000
 
-# Comando de arranque
+# Comando de inicio
 CMD ["node", "server.js"]
