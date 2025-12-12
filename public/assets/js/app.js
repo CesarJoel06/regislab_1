@@ -49,6 +49,23 @@ function formatDateForTable(value, withTime = false) {
 // Estado global para saber si estamos editando algo
 window.__editing = { scope: null, id: null };
 
+// Filtros por rango de fechas (YYYY-MM-DD) por módulo
+window.__filters = window.__filters || {
+  recepciones: { from: '', to: '' },
+  produccion: { from: '', to: '' },
+  defectuosos: { from: '', to: '' },
+  envios: { from: '', to: '' }
+};
+
+function buildFilterQuery(scope) {
+  const f = (window.__filters && window.__filters[scope]) || { from: '', to: '' };
+  const qs = new URLSearchParams();
+  if (f.from) qs.set('from', f.from);
+  if (f.to) qs.set('to', f.to);
+  const s = qs.toString();
+  return s ? `?${s}` : '';
+}
+
 function setEditing(scope, id) {
   window.__editing = { scope, id };
 }
@@ -135,9 +152,13 @@ function hookForm(scope) {
 async function renderTable(scope) {
   const tbl = document.querySelector(`table[data-table="${scope}"]`);
   if (!tbl) return;
-  const data = await api(`/api/${scope}`);
+  const data = await api(`/api/${scope}${buildFilterQuery(scope)}`);
   const tbody = tbl.querySelector('tbody');
   tbody.innerHTML = '';
+
+  // Actualizar contador si existe
+  const countEl = document.getElementById(`count-${scope}`);
+  if (countEl) countEl.textContent = String((data.items || []).length);
 
   data.items.forEach(r => {
     const tr = document.createElement('tr');
@@ -355,14 +376,64 @@ async function initPanel() {
 
   ['recepciones', 'produccion', 'defectuosos', 'envios'].forEach(scope => {
     hookForm(scope);
-    renderTable(scope);
+    renderTable(scope).catch(err => {
+      console.error(`Error cargando tabla ${scope}:`, err);
+    });
+  });
+
+  // Hook filtros (from/to) y exportaciones (PDF/XLSX) por sección
+  document.querySelectorAll('[data-filter-apply]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const scope = btn.dataset.filterApply;
+      const fromEl = document.querySelector(`[data-filter-from="${scope}"]`);
+      const toEl = document.querySelector(`[data-filter-to="${scope}"]`);
+      const from = fromEl ? String(fromEl.value || '') : '';
+      const to = toEl ? String(toEl.value || '') : '';
+      window.__filters[scope] = { from, to };
+      try {
+        await renderTable(scope);
+      } catch (err) {
+        console.error('Error aplicando filtro:', err);
+        alert('No se pudo aplicar el filtro. Revisa consola.');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-filter-all]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const scope = btn.dataset.filterAll;
+      window.__filters[scope] = { from: '', to: '' };
+      const fromEl = document.querySelector(`[data-filter-from="${scope}"]`);
+      const toEl = document.querySelector(`[data-filter-to="${scope}"]`);
+      if (fromEl) fromEl.value = '';
+      if (toEl) toEl.value = '';
+      try {
+        await renderTable(scope);
+      } catch (err) {
+        console.error('Error mostrando todo:', err);
+        alert('No se pudo refrescar la tabla. Revisa consola.');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-export]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const scope = btn.dataset.export;
+      const fmt = btn.dataset.format || 'pdf';
+      const qs = buildFilterQuery(scope);
+      // Evita bloqueos de pop-ups: para descargas usamos navegación directa.
+      // En caso de PDF el navegador lo abrirá o descargará según configuración.
+      window.location.href = `/api/${scope}.${fmt}${qs}`;
+    });
   });
 
   // Botones PDF
   document.querySelectorAll('[data-pdf]').forEach(btn => {
     btn.addEventListener('click', () => {
       const type = btn.dataset.pdf;
-      window.open(`/api/${type}.pdf`, '_blank');
+      // Si existe filtro activo en ese módulo, lo respetamos
+      const qs = (window.__filters && window.__filters[type]) ? buildFilterQuery(type) : '';
+      window.open(`/api/${type}.pdf${qs}`, '_blank');
     });
   });
 
@@ -407,5 +478,7 @@ async function initPanel() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (location.pathname === '/panel.html') initPanel();
+  // En algunos despliegues (reverse proxy / subpath) el pathname puede variar.
+  // Usamos un chequeo más flexible para asegurar que el panel inicialice.
+  if (String(location.pathname || '').endsWith('panel.html')) initPanel();
 });

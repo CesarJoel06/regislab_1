@@ -12,6 +12,7 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import PDFDocument from 'pdfkit';
 import bcrypt from 'bcryptjs';
+import * as XLSX from 'xlsx';
 
 dotenv.config();
 
@@ -159,6 +160,43 @@ function formatDateTimeYmdToDmy(s) {
   if (!timeRaw) return date;
   const time = timeRaw.slice(0, 5); // HH:MM
   return `${date} ${time}`;
+}
+
+// -----------------------------------------------------------------------------
+// Filtros por rango de fechas (YYYY-MM-DD) para listados y exportaciones
+//  - from / to son inclusivos
+//  - el campo puede ser DATE (YYYY-MM-DD) o DATETIME (YYYY-MM-DDTHH:MM)
+// -----------------------------------------------------------------------------
+function normalizeYmd(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const m = s.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : '';
+}
+
+function buildDateWhere({ field, from, to }) {
+  const f = normalizeYmd(from);
+  const t = normalizeYmd(to);
+  const dateExpr = `date(substr(${field},1,10))`;
+  if (f && t) {
+    return {
+      where: `WHERE ${dateExpr} BETWEEN date(?) AND date(?)`,
+      params: [f, t]
+    };
+  }
+  if (f) {
+    return {
+      where: `WHERE ${dateExpr} >= date(?)`,
+      params: [f]
+    };
+  }
+  if (t) {
+    return {
+      where: `WHERE ${dateExpr} <= date(?)`,
+      params: [t]
+    };
+  }
+  return { where: '', params: [] };
 }
 
 // -----------------------------------------------------------------------------
@@ -418,7 +456,12 @@ app.get('/me', (req, res) => {
 // Recepciones
 // -----------------------------------------------------------------------------
 app.get('/api/recepciones', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM recepciones ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM recepciones ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   res.json({ items: list });
 });
 
@@ -470,7 +513,12 @@ app.delete('/api/recepciones/:id', requireRole('supervisor', 'administrador'), a
 // Producción
 // -----------------------------------------------------------------------------
 app.get('/api/produccion', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM produccion ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha_ini', from, to });
+  const list = await db.all(
+    `SELECT * FROM produccion ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   res.json({ items: list });
 });
 
@@ -524,7 +572,12 @@ app.delete('/api/produccion/:id', requireRole('supervisor', 'administrador'), as
 // Defectuosos
 // -----------------------------------------------------------------------------
 app.get('/api/defectuosos', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM defectuosos ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM defectuosos ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   res.json({ items: list });
 });
 
@@ -578,7 +631,12 @@ app.delete('/api/defectuosos/:id', requireRole('supervisor', 'administrador'), a
 // Envíos
 // -----------------------------------------------------------------------------
 app.get('/api/envios', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM envios ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM envios ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   res.json({ items: list });
 });
 
@@ -745,9 +803,39 @@ function drawTable(doc, headers, widths, rowValues) {
   doc.y = y + 4;
 }
 
+// -----------------------------------------------------------------------------
+// Exportación XLSX (Excel)
+// -----------------------------------------------------------------------------
+function sendXlsx(res, filename, sheets) {
+  // sheets: Array<{ name: string, aoa: any[][] }>
+  const wb = XLSX.utils.book_new();
+  for (const s of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet(s.aoa);
+    XLSX.utils.book_append_sheet(wb, ws, s.name);
+  }
+
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.end(buf);
+}
+
+function safeSheetName(name) {
+  const s = String(name || 'Sheet').replace(/[\\/\?\*\[\]]/g, '-');
+  return s.length > 31 ? s.slice(0, 31) : s;
+}
+
 // PDFs por módulo
 app.get('/api/recepciones.pdf', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM recepciones ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM recepciones ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   const doc = startPdf(res, 'recepciones.pdf', 'Recepción de Materiales');
 
   const headers = ['Fecha', 'Tipo', 'Cantidad', 'Unidad'];
@@ -765,7 +853,12 @@ app.get('/api/recepciones.pdf', requireAuth, async (req, res) => {
 });
 
 app.get('/api/produccion.pdf', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM produccion ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha_ini', from, to });
+  const list = await db.all(
+    `SELECT * FROM produccion ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   const doc = startPdf(res, 'produccion.pdf', 'Producción de Productos');
 
   const headers = ['Fecha', 'Tipo de producto', 'Cantidad', 'Unidad'];
@@ -783,7 +876,12 @@ app.get('/api/produccion.pdf', requireAuth, async (req, res) => {
 });
 
 app.get('/api/defectuosos.pdf', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM defectuosos ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM defectuosos ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   const doc = startPdf(res, 'defectuosos.pdf', 'Manejo de Material Defectuoso');
 
   const headers = ['Fecha', 'Tipo', 'Cantidad', 'Unidad', 'Razón'];
@@ -802,7 +900,12 @@ app.get('/api/defectuosos.pdf', requireAuth, async (req, res) => {
 });
 
 app.get('/api/envios.pdf', requireAuth, async (req, res) => {
-  const list = await db.all("SELECT * FROM envios ORDER BY created_at DESC");
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM envios ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
   const doc = startPdf(res, 'envios.pdf', 'Envío de Productos Terminados');
 
   const headers = ['Fecha', 'Cliente', 'Tipo', 'Detalle', 'Cantidad', 'Unidad'];
@@ -821,13 +924,80 @@ app.get('/api/envios.pdf', requireAuth, async (req, res) => {
   doc.end();
 });
 
+// XLSX por módulo (respeta filtros from/to)
+app.get('/api/recepciones.xlsx', requireAuth, async (req, res) => {
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM recepciones ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
+  const aoa = [
+    ['Fecha', 'Tipo', 'Cantidad', 'Unidad'],
+    ...list.map(r => [formatPdfDateTime(r.fecha), r.tipo, r.cantidad, r.unidad || ''])
+  ];
+  sendXlsx(res, 'recepciones.xlsx', [{ name: safeSheetName('Recepciones'), aoa }]);
+});
+
+app.get('/api/produccion.xlsx', requireAuth, async (req, res) => {
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha_ini', from, to });
+  const list = await db.all(
+    `SELECT * FROM produccion ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
+  const aoa = [
+    ['Fecha', 'Tipo de producto', 'Cantidad', 'Unidad'],
+    ...list.map(r => [formatPdfDateTime(r.fecha_ini), r.tipo || '', r.cantidad, r.unidad || ''])
+  ];
+  sendXlsx(res, 'produccion.xlsx', [{ name: safeSheetName('Produccion'), aoa }]);
+});
+
+app.get('/api/defectuosos.xlsx', requireAuth, async (req, res) => {
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM defectuosos ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
+  const aoa = [
+    ['Fecha', 'Tipo', 'Cantidad', 'Unidad', 'Razón'],
+    ...list.map(r => [formatPdfDateOnly(r.fecha), r.tipo, r.cantidad, r.unidad || '', r.razon || ''])
+  ];
+  sendXlsx(res, 'defectuosos.xlsx', [{ name: safeSheetName('Defectuosos'), aoa }]);
+});
+
+app.get('/api/envios.xlsx', requireAuth, async (req, res) => {
+  const { from, to } = req.query || {};
+  const f = buildDateWhere({ field: 'fecha', from, to });
+  const list = await db.all(
+    `SELECT * FROM envios ${f.where} ORDER BY created_at DESC`,
+    f.params
+  );
+  const aoa = [
+    ['Fecha', 'Cliente', 'Tipo', 'Detalle', 'Cantidad', 'Unidad'],
+    ...list.map(r => [
+      formatPdfDateOnly(r.fecha),
+      r.cliente,
+      r.tipo,
+      r.descripcion || '',
+      r.cantidad,
+      r.unidad || ''
+    ])
+  ];
+  sendXlsx(res, 'envios.xlsx', [{ name: safeSheetName('Envios'), aoa }]);
+});
+
 app.get('/api/registros.pdf', requireAuth, async (req, res) => {
   const doc = startPdf(res, 'registros_completos.pdf', 'Registro Completo de Operaciones');
+
+  const { from, to } = req.query || {};
 
   const sections = [
     {
       titulo: 'Recepción de Materiales',
-      query: 'SELECT * FROM recepciones ORDER BY created_at DESC',
+      table: 'recepciones',
+      field: 'fecha',
       headers: ['Fecha', 'Tipo', 'Cantidad', 'Unidad'],
       widths: [100, 210, 80, 60],
       map: r => [
@@ -839,7 +1009,8 @@ app.get('/api/registros.pdf', requireAuth, async (req, res) => {
     },
     {
       titulo: 'Producción de Productos',
-      query: 'SELECT * FROM produccion ORDER BY created_at DESC',
+      table: 'produccion',
+      field: 'fecha_ini',
       headers: ['Fecha', 'Tipo de producto', 'Cantidad', 'Unidad'],
       widths: [100, 210, 80, 60],
       map: r => [
@@ -851,7 +1022,8 @@ app.get('/api/registros.pdf', requireAuth, async (req, res) => {
     },
     {
       titulo: 'Manejo de Material Defectuoso',
-      query: 'SELECT * FROM defectuosos ORDER BY created_at DESC',
+      table: 'defectuosos',
+      field: 'fecha',
       headers: ['Fecha', 'Tipo', 'Cantidad', 'Unidad', 'Razón'],
       widths: [80, 130, 60, 60, 140],
       map: r => [
@@ -864,7 +1036,8 @@ app.get('/api/registros.pdf', requireAuth, async (req, res) => {
     },
     {
       titulo: 'Envío de Productos Terminados',
-      query: 'SELECT * FROM envios ORDER BY created_at DESC',
+      table: 'envios',
+      field: 'fecha',
       headers: ['Fecha', 'Cliente', 'Tipo', 'Detalle', 'Cantidad', 'Unidad'],
       widths: [80, 120, 80, 120, 60, 60],
       map: r => [
@@ -880,7 +1053,11 @@ app.get('/api/registros.pdf', requireAuth, async (req, res) => {
 
   let first = true;
   for (const s of sections) {
-    const list = await db.all(s.query);
+    const f = buildDateWhere({ field: s.field, from, to });
+    const list = await db.all(
+      `SELECT * FROM ${s.table} ${f.where} ORDER BY created_at DESC`,
+      f.params
+    );
     if (!first) {
       doc.addPage();
     } else {
@@ -898,6 +1075,61 @@ app.get('/api/registros.pdf', requireAuth, async (req, res) => {
   }
 
   doc.end();
+});
+
+app.get('/api/registros.xlsx', requireAuth, async (req, res) => {
+  const { from, to } = req.query || {};
+
+  const def = [
+    {
+      sheet: 'Recepciones',
+      table: 'recepciones',
+      field: 'fecha',
+      headers: ['Fecha', 'Tipo', 'Cantidad', 'Unidad'],
+      map: r => [formatPdfDateTime(r.fecha), r.tipo, r.cantidad, r.unidad || '']
+    },
+    {
+      sheet: 'Produccion',
+      table: 'produccion',
+      field: 'fecha_ini',
+      headers: ['Fecha', 'Tipo de producto', 'Cantidad', 'Unidad'],
+      map: r => [formatPdfDateTime(r.fecha_ini), r.tipo || '', r.cantidad, r.unidad || '']
+    },
+    {
+      sheet: 'Defectuosos',
+      table: 'defectuosos',
+      field: 'fecha',
+      headers: ['Fecha', 'Tipo', 'Cantidad', 'Unidad', 'Razón'],
+      map: r => [formatPdfDateOnly(r.fecha), r.tipo, r.cantidad, r.unidad || '', r.razon || '']
+    },
+    {
+      sheet: 'Envios',
+      table: 'envios',
+      field: 'fecha',
+      headers: ['Fecha', 'Cliente', 'Tipo', 'Detalle', 'Cantidad', 'Unidad'],
+      map: r => [
+        formatPdfDateOnly(r.fecha),
+        r.cliente,
+        r.tipo,
+        r.descripcion || '',
+        r.cantidad,
+        r.unidad || ''
+      ]
+    }
+  ];
+
+  const sheets = [];
+  for (const s of def) {
+    const f = buildDateWhere({ field: s.field, from, to });
+    const list = await db.all(
+      `SELECT * FROM ${s.table} ${f.where} ORDER BY created_at DESC`,
+      f.params
+    );
+    const aoa = [s.headers, ...list.map(s.map)];
+    sheets.push({ name: safeSheetName(s.sheet), aoa });
+  }
+
+  sendXlsx(res, 'registros_completos.xlsx', sheets);
 });
 
 // -----------------------------------------------------------------------------

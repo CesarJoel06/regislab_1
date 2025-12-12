@@ -108,10 +108,33 @@
       <!-- Fecha y hora -->
       <input class="input input-datetime" type="datetime-local" name="fecha" required>
 
-      <div class="col-span">
+      <div class="col-span actions-row">
         <button class="btn btn-primary" type="submit">Registrar Recepción</button>
+
+        <!-- Requerido: botón Excel al lado de Registrar Recepción -->
+        <button class="btn-small" type="button" data-export="recepciones" data-format="xlsx">
+          <span>Exportar Excel</span>
+        </button>
       </div>
     </form>
+
+    <!-- Filtro por rango de fechas + contador + exportaciones por selección -->
+    <div class="card mt-lg" data-filter-scope="recepciones">
+      <div class="tag" style="margin-bottom:10px; display:inline-block;">Restringir búsqueda</div>
+      <div class="actions-row">
+        <input class="input inline-edit" type="date" data-filter-from="recepciones" aria-label="Desde">
+        <input class="input inline-edit" type="date" data-filter-to="recepciones" aria-label="Hasta">
+
+        <button class="btn-small" type="button" data-filter-apply="recepciones">Filtrar</button>
+        <button class="btn-small" type="button" data-filter-all="recepciones">Mostrar todo</button>
+
+        <span class="tag">Registros: <b id="count-recepciones">0</b></span>
+
+        <button class="btn-small" type="button" data-export="recepciones" data-format="xlsx">
+          <span>Exportar Excel</span>
+        </button>
+      </div>
+    </div>
 
     <div class="card mt-lg">
       <table class="table" data-table="recepciones">
@@ -158,6 +181,23 @@
       </div>
     </form>
 
+    <div class="card mt-lg" data-filter-scope="produccion">
+      <div class="tag" style="margin-bottom:10px; display:inline-block;">Restringir búsqueda</div>
+      <div class="actions-row">
+        <input class="input inline-edit" type="date" data-filter-from="produccion" aria-label="Desde">
+        <input class="input inline-edit" type="date" data-filter-to="produccion" aria-label="Hasta">
+
+        <button class="btn-small" type="button" data-filter-apply="produccion">Filtrar</button>
+        <button class="btn-small" type="button" data-filter-all="produccion">Mostrar todo</button>
+
+        <span class="tag">Registros: <b id="count-produccion">0</b></span>
+
+        <button class="btn-small" type="button" data-export="produccion" data-format="xlsx">
+          <span>Exportar Excel</span>
+        </button>
+      </div>
+    </div>
+
     <div class="card mt-lg">
       <table class="table" data-table="produccion">
         <thead>
@@ -197,6 +237,24 @@
         <button class="btn btn-primary" type="submit">Registrar Descarte</button>
       </div>
     </form>
+
+
+    <div class="card mt-lg" data-filter-scope="defectuosos">
+      <div class="tag" style="margin-bottom:10px; display:inline-block;">Restringir búsqueda</div>
+      <div class="actions-row">
+        <input class="input inline-edit" type="date" data-filter-from="defectuosos" aria-label="Desde">
+        <input class="input inline-edit" type="date" data-filter-to="defectuosos" aria-label="Hasta">
+
+        <button class="btn-small" type="button" data-filter-apply="defectuosos">Filtrar</button>
+        <button class="btn-small" type="button" data-filter-all="defectuosos">Mostrar todo</button>
+
+        <span class="tag">Registros: <b id="count-defectuosos">0</b></span>
+
+        <button class="btn-small" type="button" data-export="defectuosos" data-format="xlsx">
+          <span>Exportar Excel</span>
+        </button>
+      </div>
+    </div>
 
     <div class="card mt-lg">
       <table class="table" data-table="defectuosos">
@@ -238,6 +296,24 @@
         <button class="btn btn-primary" type="submit">Registrar Envío</button>
       </div>
     </form>
+
+    <!-- Filtro por rango de fechas + contador + exportaciones -->
+    <div class="card mt-lg" data-filter-scope="envios">
+      <div class="tag" style="margin-bottom:10px; display:inline-block;">Restringir búsqueda</div>
+      <div class="actions-row">
+        <input class="input inline-edit" type="date" data-filter-from="envios" aria-label="Desde">
+        <input class="input inline-edit" type="date" data-filter-to="envios" aria-label="Hasta">
+
+        <button class="btn-small" type="button" data-filter-apply="envios">Filtrar</button>
+        <button class="btn-small" type="button" data-filter-all="envios">Mostrar todo</button>
+
+        <span class="tag">Registros: <b id="count-envios">0</b></span>
+
+        <button class="btn-small" type="button" data-export="envios" data-format="xlsx">
+          <span>Exportar Excel</span>
+        </button>
+      </div>
+    </div>
 
     <div class="card mt-lg">
       <table class="table" data-table="envios">
@@ -295,6 +371,6 @@
 
 </main>
 
-<script src="./assets/js/app.js?v=14"></script>
+<script src="./assets/js/app.js?v=15"></script>
 </body>
 </html>
