@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none">
+  <!-- hoja de documento, mismo estilo que icon_pdf -->
+  <path d="M7 3h7l5 5v13H7z" fill="#020617" stroke="#38BDF8" stroke-width="1.6" stroke-linejoin="round"></path>
+  <path d="M14 3v5h5" fill="#020617" stroke="#38BDF8" stroke-width="1.6" stroke-linejoin="round"></path>
+
+  <!-- letra X de Excel en estilo azul -->
+  <path d="M9 15l3-4.5L15 15m-6 0h6" fill="none" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>

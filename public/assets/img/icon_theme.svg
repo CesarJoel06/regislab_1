@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none">
+  <!-- círculo de fondo suave para integrar con el resto de iconos -->
+  <circle cx="12" cy="12" r="9" fill="#020617" stroke="#38BDF8" stroke-width="1.6"></circle>
+
+  <!-- rayos -->
+  <path d="M12 3V5" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M12 19V21" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M5 12H3" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M21 12H19" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M6.22 6.22L7.64 7.64" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M16.36 16.36L17.78 17.78" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M16.36 7.64L17.78 6.22" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+  <path d="M6.22 17.78L7.64 16.36" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"></path>
+
+  <!-- “sol” central -->
+  <circle cx="12" cy="12" r="3.5" fill="#020617" stroke="#38BDF8" stroke-width="1.6"></circle>
+</svg>
