@@ -421,6 +421,46 @@ async function initPanel() {
 
 
   initSidebarNavigation();
+
+  // Botón "Ahora": setea la fecha/hora actual en el input del formulario.
+  // Soporta tanto <input type="date"> como <input type="datetime-local">.
+  (function hookNowButtons() {
+    const pad2 = (n) => String(n).padStart(2, '0');
+
+    const toDateValue = (d) => {
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    };
+
+    const toDateTimeLocalValue = (d) => {
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    };
+
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target && ev.target.closest ? ev.target.closest('.now-btn[data-now]') : null;
+      if (!btn) return;
+
+      ev.preventDefault();
+
+      // Primero buscamos el input dentro del mismo bloque visual (.date-row)
+      const row = btn.closest('.date-row');
+      let input = row ? row.querySelector('input[type="datetime-local"], input[type="date"]') : null;
+
+      // Fallback: por si cambia el HTML, buscamos en el form del scope
+      if (!input) {
+        const scope = btn.dataset.now;
+        const form = scope ? document.querySelector(`form[data-form="${scope}"]`) : null;
+        input = form ? form.querySelector('input[type="datetime-local"], input[type="date"]') : null;
+      }
+
+      if (!input) return;
+
+      const now = new Date();
+      if (input.type === 'datetime-local') input.value = toDateTimeLocalValue(now);
+      else input.value = toDateValue(now);
+
+      try { input.focus(); } catch {}
+    });
+  })();
   if (me.user.role === 'operario') {
     document.body.classList.add('readonly');
   }
